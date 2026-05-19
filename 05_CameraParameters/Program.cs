@@ -1,17 +1,21 @@
 // =============================================================================
-//  예제 05 : Camera Parameters  -  파라미터 다루기 (.NET 26.04 SDK)
-// -----------------------------------------------------------------------------
+//  예제 05 : Camera Parameters
+// =============================================================================
 //  목적
-//    - 모듈 별 Get/Set 메서드(PascalCase) 사용법 익히기.
-//    - 노출/게인/픽셀포맷/ROI/트리거 모드 변경 후 짧게 그랩.
+//    Remote(카메라) / Interface / Device 모듈의 파라미터 읽기·쓰기 방법을 익힌다.
+//    노출/게인/픽셀포맷/ROI/트리거 모드를 변경한 뒤 짧게 그랩해 효과를 확인한다.
 //
-//  C# 메서드 명명 규칙 (.NET 26.04)
-//    Get/Set + Type + Module + Module(접미사)
-//    예 :
-//      GetStringRemoteModule("PixelFormat")
-//      SetIntegerRemoteModule("Width", 640)
-//      SetFloatRemoteModule("ExposureTime", 5000.0)
-//      ExecuteCommandRemoteModule("AcquisitionStart")
+//  흐름 요약
+//    1. DumpCurrent()   : 현재 설정 출력 (string → long → double 순으로 타입 자동 탐지)
+//    2. ApplySettings() : Width/Height/PixelFormat 등 변경 (Start 전에만 가능)
+//    3. DumpCurrent()   : 변경 후 설정 재출력
+//    4. ShortGrab()     : 변경된 설정으로 N 장 동기 그랩
+//
+//  .NET SDK Get/Set 패턴
+//    grabber.Remote.Get<string>("PixelFormat")         // string/enum 노드 읽기
+//    grabber.Remote.Set<long>("Width", 640)            // integer 노드 쓰기
+//    grabber.Remote.Set<double>("ExposureTime", 5000.0)// float 노드 쓰기
+//    grabber.Remote.Set<string>("TriggerMode", "Off")  // enum 노드는 string 으로 전달
 // =============================================================================
 
 using System;
@@ -21,7 +25,7 @@ namespace CameraParameters
 {
     internal static class Program
     {
-        // 노드가 없을 수도 있으므로 try/catch 로 안전하게
+        // ── TrySet 헬퍼: 노드가 없거나 읽기 전용인 경우 예외를 삼키고 결과를 출력 ──────
         private static void TrySetString(EG.EGrabber g, string name, string v)
         {
             try { g.Remote.Set<string>(name, v); Console.WriteLine($"  setString  {name} = \"{v}\"  OK"); }
@@ -38,7 +42,8 @@ namespace CameraParameters
             catch (Exception e) { Console.WriteLine($"  setFloat   {name} = {v}  FAIL ({e.Message})"); }
         }
 
-        // RemoteModule 의 노드 1개를 안전하게 dump
+        // ── Dump: RemoteModule 노드 하나를 string → long → double 순으로 읽기 시도 ────
+        // GenAPI 노드는 대부분 string 으로도 읽히므로 string 을 먼저 시도한다.
         private static void Dump(EG.EGrabber g, string name)
         {
             try { Console.WriteLine($"  {name,-22} = {g.Remote.Get<string>(name)}"); return; }  catch {}
@@ -47,6 +52,7 @@ namespace CameraParameters
             Console.WriteLine($"  {name,-22} = (n/a)");
         }
 
+        // ── DumpCurrent: 카메라의 주요 파라미터를 현재 값으로 출력 ───────────────────
         private static void DumpCurrent(EG.EGrabber g)
         {
             Console.WriteLine();
@@ -64,6 +70,8 @@ namespace CameraParameters
             Dump(g, "TriggerMode");
         }
 
+        // ── ApplySettings: ROI / 픽셀포맷 / 노출 / 트리거 설정 변경 ──────────────────
+        // ROI(Width·Height·Offset) 변경은 AcquisitionStart 전에만 허용하는 카메라가 많다.
         private static void ApplySettings(EG.EGrabber g)
         {
             Console.WriteLine();
@@ -79,6 +87,8 @@ namespace CameraParameters
             TrySetString (g, "TriggerMode",  "Off");
         }
 
+        // ── ShortGrab: 변경된 설정으로 n 장 동기 그랩 ──────────────────────────────
+        // Start(n, true) 는 n 장 수신 후 자동으로 AcquisitionStop 및 Stop 을 호출한다.
         private static void ShortGrab(EG.EGrabber g, int n)
         {
             g.ReallocBuffers(4ul);
@@ -97,6 +107,7 @@ namespace CameraParameters
             }
         }
 
+        // ── OpenGenTL: Coaxlink → PlayLink 순서로 EGenTL 열기 ────────────────────────
         private static EG.EGenTL OpenGenTL(out string producer)
         {
             try

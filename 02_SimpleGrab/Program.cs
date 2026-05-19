@@ -1,14 +1,16 @@
 // =============================================================================
-//  예제 02 : Simple Grab  -  가장 단순한 동기식 그랩
-// -----------------------------------------------------------------------------
+//  예제 02 : Simple Grab
+// =============================================================================
 //  목적
-//    - 콜백 없이 N 장의 영상을 차례로 받아오는 가장 기본 패턴.
-//    - 보드 없으면 PlayLink 로 자동 전환.
+//    콜백 없이 N 장의 영상을 동기식으로 차례로 받아오는 가장 기본 패턴.
+//    보드 없으면 PlayLink 로 자동 전환.
 //
-//  핵심
-//    - ReallocBuffers(N)   : DMA 버퍼 N 개 미리 확보
-//    - Start(M, false)     : M 장 받으면 자동 stop
-//    - ScopedBuffer        : using 으로 자동 push/pop
+//  흐름 요약
+//    1. EGenTL(Coaxlink) → grabber 없으면 EGenTL(PlayLink) 로 재시도
+//    2. ReallocBuffers(N) : DMA 버퍼 미리 확보 (Start 전에 반드시 호출)
+//    3. Start(M, true)    : M 장 수신 후 자동 Stop.
+//                          controlRemoteDevice=true 로 AcquisitionStart 자동 전송.
+//    4. ScopedBuffer 루프 : using 블록 종료 시 버퍼가 자동으로 큐에 반환됨.
 // =============================================================================
 
 using System;
@@ -21,7 +23,8 @@ namespace SimpleGrab
         private const int FramesToGrab = 10;
         private const int BufferCount  = 4;
 
-        // 실 보드 → PlayLink 순서로 시도
+        // ── OpenGenTL: Coaxlink → PlayLink 순서로 EGenTL 열기 ────────────────────────
+        // Discover(false): grabber-oriented 스캔만 수행 (카메라 열거 생략, 속도 우선).
         private static EG.EGenTL OpenGenTL(out string producer)
         {
             try

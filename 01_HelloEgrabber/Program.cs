@@ -1,15 +1,25 @@
 // =============================================================================
-//  예제 01 : Hello eGrabber  -  보드 / 카메라 탐지 (+ PlayLink fallback)
-// -----------------------------------------------------------------------------
+//  예제 01 : Hello eGrabber
+// =============================================================================
 //  목적
-//    - PC 에 장착된 Coaxlink 보드와 카메라를 찾아 정보를 출력.
-//    - 실 보드가 없으면 PlayLink 로 자동 전환해 동일 코드로 테스트 가능.
+//    PC 에 장착된 Coaxlink 보드와 카메라를 찾아 정보를 출력한다.
+//    실 보드가 없으면 PlayLink(소프트웨어 시뮬레이터)로 자동 전환되므로
+//    하드웨어 없이도 동작을 확인할 수 있다.
+//
+//  흐름 요약
+//    1. EGenTL(Coaxlink) + EGrabberDiscovery.Discover() → grabber / camera 목록 출력
+//    2. grabber 없으면 EGenTL(PlayLink) 로 재시도
+//    3. 첫 번째 grabber 에 연결 → Interface / Device / Remote 파라미터 출력
 //
 //  .NET SDK API 요점
-//    - EGenTL(string ctiPath) : CtiPath.Coaxlink / CtiPath.Playlink 는 string 프로퍼티.
-//    - discovery.GrabberCount : C++ 의 egrabberCount() 에 해당.
-//    - grabber.Remote.Get<T>(name) : RemoteModule 파라미터 읽기.
-//    - grabber.Interface.Get<T>(name) / grabber.Device.Get<T>(name) : 각 모듈 접근.
+//    - EGenTL(ctiPath)         : CtiPath.Coaxlink / CtiPath.Playlink 는 string 상수.
+//    - discovery.GrabberCount  : C++ 의 egrabberCount() 에 해당.
+//    - grabber.Remote.Get<T>() : 카메라(RemoteModule) 파라미터 읽기.
+//    - grabber.Interface / .Device : 보드 인터페이스 / 디바이스 모듈 접근.
+//
+//  주의: IsRemoteAvailable
+//    grabber 가 발견되어도 카메라가 연결·초기화되지 않으면 Remote 모듈이 없다.
+//    info.IsRemoteAvailable 을 확인한 뒤 Remote.Get() 을 호출해야 예외를 피할 수 있다.
 // =============================================================================
 
 using System;
@@ -19,11 +29,8 @@ namespace HelloEgrabber
 {
     internal static class Program
     {
-        // ------------------------------------------------------------
-        //  지정한 Producer 로 시스템 스캔, 결과를 화면에 출력한다.
-        //  cti  : CtiPath.Coaxlink 또는 CtiPath.Playlink (둘 다 string).
-        //  반환 : 발견된 grabber 수.
-        // ------------------------------------------------------------
+        // ── DiscoverWith: 지정 Producer 로 시스템 스캔 후 grabber / camera 목록 출력 ──
+        // cti: CtiPath.Coaxlink 또는 CtiPath.Playlink   반환: 발견된 grabber 수 (실패=0)
         private static int DiscoverWith(string cti, string tag)
         {
             try
@@ -66,9 +73,7 @@ namespace HelloEgrabber
             }
         }
 
-        // ------------------------------------------------------------
-        //  첫번째 grabber 에 연결해 카메라 상세 파라미터를 출력한다.
-        // ------------------------------------------------------------
+        // ── InspectFirstGrabber: 첫 번째 grabber 에 연결 → 파라미터 상세 출력 ────────
         private static void InspectFirstGrabber(string cti)
         {
             using (var gentl     = new EG.EGenTL(cti))

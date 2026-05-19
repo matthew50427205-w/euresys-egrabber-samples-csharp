@@ -1,28 +1,25 @@
 // =============================================================================
-//  예제 03 : Callback Grab  -  콜백으로 영상 받기 (+ RunScript 로 초기 설정)
-// -----------------------------------------------------------------------------
+//  예제 03 : Callback Grab
+// =============================================================================
 //  목적
-//    - 새 프레임이 들어올 때마다 콜백이 자동 호출되도록 설정.
-//    - 카메라/보드 초기 설정은 외부 .js 파일(RunScript)으로 한 번에 적용.
+//    새 프레임이 들어올 때마다 콜백이 자동 호출되도록 설정한다.
+//    카메라/보드 초기 설정은 외부 .js 파일(RunScript)으로 한 번에 적용한다.
 //
-//  C# .NET SDK 콜백 패턴
-//    1. grabber.RegisterEventCallback<NewBufferData>((g, data) => {...})
-//       : 이벤트가 도착했을 때 호출할 람다를 등록.
-//    2. grabber.EnableEvent(EventType.NewBufferData)
-//       : Start() 전에 명시적으로 이벤트 수신을 활성화.
-//    3. grabber.ProcessEventsAsync(EventType.NewBufferData, cts.Token)
-//       : 별도 Task 를 생성해 루프 안에서 ProcessEvent 를 반복 호출.
-//       : 이 Task 가 실행되어야 콜백이 실제로 호출된다.
-//    4. CancellationTokenSource.Cancel() + task.Wait() 로 종료.
-//
-//  C++ 과의 차이점
-//    - C++ 은 CallbackSingleThread 상속으로 내부 스레드가 자동 돌아감.
-//    - C# 은 ProcessEventsAsync 를 명시적으로 호출해야 한다.
+//  C# .NET SDK 콜백 패턴 (C++ 과의 차이 포함)
+//    1. RegisterEventCallback<NewBufferData>((g, data) => {...})
+//       이벤트 도착 시 호출할 람다를 등록.
+//    2. EnableEvent(EventType.NewBufferData)
+//       Start() 전에 이벤트 수신을 명시적으로 활성화해야 한다.
+//    3. ProcessEventsAsync(EventType.NewBufferData, cts.Token)
+//       별도 Task 에서 ProcessEvent 를 반복 호출 → 콜백이 실제로 실행됨.
+//       C++ 의 CallbackSingleThread 는 내부 스레드가 자동으로 돌지만,
+//       C# 은 이 Task 를 직접 시작해야 한다.
+//    4. cts.Cancel() + task.Wait() 로 이벤트 루프 종료.
 //
 //  주의
-//    - ScopedBuffer(g, data) : 콜백 인자(NewBufferData)를 받아 버퍼를 래핑.
-//                              using 블록 종료 시 버퍼를 자동으로 큐에 반환.
-//    - 카운터 등 공유 변수는 Interlocked 으로 보호 (콜백은 별도 스레드).
+//    - ScopedBuffer(g, data) : 콜백 인자(NewBufferData)로 버퍼를 RAII 래핑.
+//      using 블록 종료 시 버퍼가 자동으로 큐에 반환된다.
+//    - 콜백은 별도 스레드에서 실행되므로 공유 변수는 Interlocked 으로 보호.
 // =============================================================================
 
 using System;
@@ -37,10 +34,8 @@ namespace CallbackGrab
         private const int BufferCount  = 4;
         private const int FramesToGrab = 20;
 
-        // ------------------------------------------------------------
-        //  실 Coaxlink 보드 → PlayLink 순서로 EGenTL 을 열어 반환.
-        //  producer : 실제 사용된 Producer 이름 (로그용).
-        // ------------------------------------------------------------
+        // ── OpenGenTL: Coaxlink → PlayLink 순서로 EGenTL 열기 ────────────────────────
+        // producer: 실제 사용된 Producer 이름 (로그/디버그용 out 파라미터).
         private static EG.EGenTL OpenGenTL(out string producer)
         {
             try

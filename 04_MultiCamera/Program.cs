@@ -1,14 +1,21 @@
 // =============================================================================
-//  예제 04 : Multi Camera  -  여러 대 동시 그랩
-// -----------------------------------------------------------------------------
+//  예제 04 : Multi Camera
+// =============================================================================
 //  목적
-//    - EGrabberDiscovery.CameraCount 만큼 EGrabber 인스턴스를 만들고
-//      각각 콜백 그랩을 동시에 돌린다.
-//    - 카메라별 받은 프레임 수를 집계 후 fps 출력.
+//    EGrabberDiscovery.CameraCount 만큼 EGrabber 인스턴스를 만들어
+//    각각 콜백 그랩을 동시에 돌린다.
+//    카메라별 수신 프레임 수를 집계해 FPS 를 출력한다.
 //
-//  핵심 패턴
-//    - 각 CameraUnit 이 RegisterEventCallback + ProcessEventsAsync 를 독립 실행.
-//    - CancellationTokenSource 로 모든 카메라의 이벤트 루프를 일제히 중단.
+//  흐름 요약
+//    1. CameraUnit 생성: EGrabber 연결 + 콜백 등록 + 버퍼 확보
+//    2. 모든 CameraUnit.Start() 를 동시에 호출 → 병렬 그랩
+//    3. GrabDurationSec 후 모든 CameraUnit.Stop()
+//    4. 카메라별 FPS 출력
+//
+//  설계 포인트
+//    - CameraUnit 마다 독립 CancellationTokenSource → 카메라별 개별 중단 가능.
+//    - Count 는 public long (Interlocked 접근용) — lock 없이 원자적 증가.
+//    - finally 블록으로 예외 발생 시에도 모든 EGrabber 해제 보장.
 // =============================================================================
 
 using System;
@@ -19,9 +26,7 @@ using EG = Euresys.EGrabber;
 
 namespace MultiCamera
 {
-    // ------------------------------------------------------------
-    //  카메라 한 대 단위 : EGrabber + 이벤트 루프 + 통계
-    // ------------------------------------------------------------
+    // ── CameraUnit: 카메라 한 대 단위 (EGrabber + 이벤트 루프 + 통계) ──────────────
     internal sealed class CameraUnit : IDisposable
     {
         public int    CameraIndex { get; }
@@ -30,7 +35,7 @@ namespace MultiCamera
 
         private readonly EG.EGrabber           _grabber;
         private readonly CancellationTokenSource _cts  = new CancellationTokenSource();
-        private          Task                    _task = Task.CompletedTask;
+        private          Task                    _task = Task.CompletedTask; // Stop() 에서 null 체크 없이 Wait() 가능
 
         public CameraUnit(EG.EGrabberCameraInfo info, int idx)
         {
@@ -78,7 +83,7 @@ namespace MultiCamera
     {
         private const int GrabDurationSec = 5;
 
-        // 실 Coaxlink → PlayLink 순서로 시도
+        // ── OpenGenTL: Coaxlink → PlayLink 순서로 EGenTL 열기 ────────────────────────
         private static EG.EGenTL OpenGenTL(out string producer)
         {
             try
@@ -148,6 +153,7 @@ namespace MultiCamera
                     }
                     finally
                     {
+                        // 예외가 발생해도 모든 CameraUnit(=EGrabber) 해제 보장
                         foreach (var u in units) u.Dispose();
                     }
                 }
