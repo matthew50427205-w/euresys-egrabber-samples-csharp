@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>01HelloEgrabber</RootNamespace>
+    <AssemblyName>01_HelloEgrabber</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- eGrabber SDK 위치 -->
+  <PropertyGroup>
+    <EGrabberDir Condition="'$(EGrabberDir)' == '' AND '$(EGRABBER_DIR)' != ''">$(EGRABBER_DIR)</EGrabberDir>
+    <EGrabberDir Condition="'$(EGrabberDir)' == ''">C:\Program Files\Euresys\eGrabber</EGrabberDir>
+  </PropertyGroup>
+
+  <!-- .NET 관리 어셈블리 -->
+  <ItemGroup>
+    <Reference Include="EGrabber.NET">
+      <HintPath>$(EGrabberDir)\clr\anycpu\EGrabber.NET.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 네이티브 브리지 DLL 을 출력 디렉토리로 복사 -->
+  <ItemGroup>
+    <Content Include="$(EGrabberDir)\clr\x86_64\Coaxlink_NetApi.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>Coaxlink_NetApi.dll</Link>
+    </Content>
+  </ItemGroup>
+
+  <!-- config-*.js 도 출력 디렉토리로 복사 -->
+  <ItemGroup>
+    <Content Include="..\..\config\config-rg.js">
+      <Link>config-rg.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\config\config-sc.js">
+      <Link>config-sc.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\config\config-custom.js">
+      <Link>config-custom.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+
+</Project>
