@@ -3,3 +3,6 @@ obj/
 *.user
 .vs/
 *.suo
+
+# Node tooling for PDF generation
+node_modules/

@@ -52,7 +52,20 @@ If no Coaxlink board is detected, samples automatically fall back to PlayLink �
 
 ## Documentation
 
+- **[docs/B2S_Euresys_Samples_Guide.pdf](docs/B2S_Euresys_Samples_Guide.pdf)** — 26-page B2S customer guide in Korean. Covers Visual Studio build steps, per-sample walkthroughs with execution-output examples, OpenCV version notes, and troubleshooting.
 - **[HighSpeedDisplay_Guide.md](HighSpeedDisplay_Guide.md)** — portable guide documenting seven display patterns (single-slot handoff, backpressure, bitmap pool, downscale, `LockBits`, `OptimizedDoubleBuffer`, 30 Hz timer) for porting to other camera SDK projects.
+
+### Regenerating the PDF
+
+The PDF is generated from `docs/B2S_Euresys_Samples_Guide.html` via Puppeteer + system Edge. After editing the HTML:
+
+```bash
+cd docs/_pdfgen
+npm install        # first time only
+node generate-pdf.js
+```
+
+Output overwrites `docs/B2S_Euresys_Samples_Guide.pdf`. Page headers/footers (B2S logo, asset notice, page numbers) are injected by the script via Chromium's `Page.printToPDF` API.
 
 ## Conventions
 

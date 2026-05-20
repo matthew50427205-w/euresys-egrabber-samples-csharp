@@ -1,0 +1,8 @@
+{
+  "name": "b2s-pdf-gen",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "puppeteer-core": "^22.0.0"
+  }
+}
