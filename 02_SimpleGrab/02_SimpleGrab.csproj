@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <RootNamespace>02SimpleGrab</RootNamespace>
+    <AssemblyName>02_SimpleGrab</AssemblyName>
+  </PropertyGroup>
+
+  <!-- 공통 설정(EGrabberDir, ConfigDir, EGrabber.NET 참조, Coaxlink_NetApi.dll/config-*.js 복사)은
+       솔루션 루트의 Directory.Build.props 에서 자동 적용됩니다. -->
+
+</Project>

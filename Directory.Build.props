@@ -1,0 +1,69 @@
+<Project>
+
+  <!-- =========================================================================
+       공통 빌드 설정 (Directory.Build.props)
+       - 솔루션 루트에 위치, 모든 csproj가 자동 임포트
+       - 고객 PC마다 다른 경로는 환경변수 또는 이 파일 한 곳만 수정
+       ========================================================================= -->
+
+  <!-- eGrabber SDK 위치
+       우선순위: (1) MSBuild 속성 EGrabberDir
+                 (2) 시스템 환경변수 EGRABBER_DIR (Euresys 설치 시 보통 자동 설정)
+                 (3) 기본 설치 경로 -->
+  <PropertyGroup>
+    <EGrabberDir Condition="'$(EGrabberDir)' == '' AND '$(EGRABBER_DIR)' != ''">$(EGRABBER_DIR)</EGrabberDir>
+    <EGrabberDir Condition="'$(EGrabberDir)' == ''">C:\Program Files\Euresys\eGrabber</EGrabberDir>
+  </PropertyGroup>
+
+  <!-- config-*.js 위치
+       우선순위: (1) MSBuild 속성 ConfigDir
+                 (2) 시스템 환경변수 CONFIG_DIR
+                 (3) 솔루션 루트의 config 폴더 (기본값, 저장소와 함께 배포) -->
+  <PropertyGroup>
+    <ConfigDir Condition="'$(ConfigDir)' == '' AND '$(CONFIG_DIR)' != ''">$(CONFIG_DIR)</ConfigDir>
+    <ConfigDir Condition="'$(ConfigDir)' == ''">$(MSBuildThisFileDirectory)config</ConfigDir>
+  </PropertyGroup>
+
+  <!-- 공통 컴파일러 옵션 -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- EGrabber.NET 관리 어셈블리 참조 (존재할 때만) -->
+  <ItemGroup Condition="Exists('$(EGrabberDir)\clr\anycpu\EGrabber.NET.dll')">
+    <Reference Include="EGrabber.NET">
+      <HintPath>$(EGrabberDir)\clr\anycpu\EGrabber.NET.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- 네이티브 브리지 DLL 출력 복사 (존재할 때만) -->
+  <ItemGroup Condition="Exists('$(EGrabberDir)\clr\x86_64\Coaxlink_NetApi.dll')">
+    <Content Include="$(EGrabberDir)\clr\x86_64\Coaxlink_NetApi.dll">
+      <Link>Coaxlink_NetApi.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- config-*.js 출력 복사 (각 파일이 존재할 때만) -->
+  <ItemGroup>
+    <Content Include="$(ConfigDir)\config-rg.js"
+             Condition="Exists('$(ConfigDir)\config-rg.js')">
+      <Link>config-rg.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(ConfigDir)\config-sc.js"
+             Condition="Exists('$(ConfigDir)\config-sc.js')">
+      <Link>config-sc.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(ConfigDir)\config-custom.js"
+             Condition="Exists('$(ConfigDir)\config-custom.js')">
+      <Link>config-custom.js</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
