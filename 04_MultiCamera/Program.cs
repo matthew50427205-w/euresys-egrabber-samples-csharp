@@ -46,25 +46,32 @@ namespace MultiCamera
             try { ModelName = _grabber.Remote.Get<string>("DeviceModelName"); }
             catch { ModelName = "(unknown)"; }
 
-            // 콜백 등록 : 프레임 수만 세고, 실 응용에서는 여기서 이미지 처리
-            _grabber.RegisterEventCallback<EG.NewBufferData>((g, data) =>
-            {
-                using (var buf = new EG.ScopedBuffer(g, data))
-                {
-                    Interlocked.Increment(ref Count);
-                }
-            });
+            // 콜백 등록 : 람다 대신 별도 인스턴스 메서드 OnNewBuffer 를 등록.
+            // 03_CallbackGrab 과 통일된 스타일. 인스턴스 메서드이므로 this.Count 자동 접근.
+            _grabber.RegisterEventCallback<EG.NewBufferData>(OnNewBuffer);
 
             // 이벤트 활성화 및 버퍼 확보 (Start 전에 수행)
             _grabber.EnableEvent(EG.EventType.NewBufferData);
             _grabber.ReallocBuffers(4ul);
         }
 
+        // ── 새 프레임 콜백 (인스턴스 메서드) ──────────────────────────────────────
+        // SDK 이벤트 스레드(ProcessEventsAsync 가 만든 Task)에서 호출된다.
+        // 인스턴스 메서드이므로 Count 는 자동으로 이 객체의 필드를 가리킨다 (this 생략).
+        // 카메라가 N대면 N개의 CameraUnit 객체 각자의 Count 가 독립적으로 증가.
+        private void OnNewBuffer(EG.EGrabber g, EG.NewBufferData data)
+        {
+            using (var buf = new EG.ScopedBuffer(g, data))
+            {
+                Interlocked.Increment(ref Count);
+            }
+        }
+
         // Start : 그랩 시작 + 이벤트 루프 가동
         public void Start()
         {
-            // controlRemoteDevice=true : AcquisitionStart 명령 자동 실행
-            _grabber.Start(ulong.MaxValue, true);
+            // Start() : 인자 생략 = 무한 그랩 + AcquisitionStart 자동 실행 (유레시스 공식 권장)
+            _grabber.Start();
             _task = _grabber.ProcessEventsAsync(EG.EventType.NewBufferData, _cts.Token);
         }
 
@@ -112,11 +119,12 @@ namespace MultiCamera
                     discovery.Discover();
 
                     int n = discovery.CameraCount;
-                    Console.WriteLine($"Producer  : {producer}");
-                    Console.WriteLine($"발견 카메라 : {n}");
+                    Console.WriteLine($"Producer        : {producer}");
+                    Console.WriteLine($"Physical boards : {discovery.InterfaceCount}");
+                    Console.WriteLine($"Cameras found   : {n}");
                     if (n == 0)
                     {
-                        Console.Error.WriteLine("연결된 카메라가 없습니다.");
+                        Console.Error.WriteLine("No cameras connected.");
                         return 1;
                     }
 
@@ -132,7 +140,7 @@ namespace MultiCamera
                         }
 
                         Console.WriteLine();
-                        Console.WriteLine($"{GrabDurationSec} 초간 그랩 시작");
+                        Console.WriteLine($"Starting grab for {GrabDurationSec} seconds");
 
                         // 모든 카메라 동시 시작
                         foreach (var u in units) u.Start();
@@ -143,7 +151,7 @@ namespace MultiCamera
                         foreach (var u in units) u.Stop();
 
                         Console.WriteLine();
-                        Console.WriteLine("--- 결과 ---");
+                        Console.WriteLine("--- Results ---");
                         foreach (var u in units)
                         {
                             double fps = (double)u.Count / GrabDurationSec;
@@ -160,10 +168,23 @@ namespace MultiCamera
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"오류: {e.Message}");
+                Console.Error.WriteLine($"Error: {e.Message}");
                 return 1;
             }
+            finally
+            {
+                WaitForExit();
+            }
             return 0;
+        }
+
+        // ── 콘솔 창이 즉시 닫히지 않도록 키 입력 대기 ─────────────────────────────
+        // 입력이 리다이렉트된 경우(파이프/CI)는 hang 방지를 위해 그냥 통과한다.
+        private static void WaitForExit()
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit...");
+            if (!Console.IsInputRedirected) Console.ReadKey(true);
         }
     }
 }

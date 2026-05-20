@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <RootNamespace>07InspectionPipeline</RootNamespace>
+    <AssemblyName>07_InspectionPipeline</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <!-- 공통 설정(EGrabberDir, EGrabber.NET 참조, Coaxlink_NetApi.dll/config-*.js 복사)은
+       솔루션 루트의 Directory.Build.props 에서 자동 적용됩니다. -->
+
+  <!-- OpenCvSharp4 - BGR 변환 / 리사이즈용 NuGet -->
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4"             Version="4.9.0.20240103" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.9.0.20240103" />
+  </ItemGroup>
+
+</Project>

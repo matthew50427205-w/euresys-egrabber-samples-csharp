@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -13,6 +13,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "05_CameraParameters", "05_CameraParameters\05_CameraParameters.csproj", "{BBBBBBBB-2222-2222-2222-000000000005}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "06_DisplayWithOpenCV", "06_DisplayWithOpenCV\06_DisplayWithOpenCV.csproj", "{BBBBBBBB-2222-2222-2222-000000000006}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "07_InspectionPipeline", "07_InspectionPipeline\07_InspectionPipeline.csproj", "{8DECDA4F-A072-4335-AFD0-F003AA2612FB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -44,6 +46,10 @@ Global
 		{BBBBBBBB-2222-2222-2222-000000000006}.Debug|x64.Build.0 = Debug|x64
 		{BBBBBBBB-2222-2222-2222-000000000006}.Release|x64.ActiveCfg = Release|x64
 		{BBBBBBBB-2222-2222-2222-000000000006}.Release|x64.Build.0 = Release|x64
+		{8DECDA4F-A072-4335-AFD0-F003AA2612FB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8DECDA4F-A072-4335-AFD0-F003AA2612FB}.Debug|x64.Build.0 = Debug|Any CPU
+		{8DECDA4F-A072-4335-AFD0-F003AA2612FB}.Release|x64.ActiveCfg = Release|Any CPU
+		{8DECDA4F-A072-4335-AFD0-F003AA2612FB}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

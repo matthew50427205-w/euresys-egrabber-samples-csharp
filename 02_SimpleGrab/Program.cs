@@ -60,13 +60,13 @@ namespace SimpleGrab
                         discovery.Discover();
                         if (discovery.GrabberCount == 0)
                         {
-                            Console.Error.WriteLine("사용 가능한 grabber 없음.");
+                            Console.Error.WriteLine("No grabber available.");
                             return 1;
                         }
 
                         using (var grabber = new EG.EGrabber(discovery.EGrabbers[0]))
                         {
-                            Console.Write("Grabber 열림 - ");
+                            Console.Write("Grabber opened - ");
                             try
                             {
                                 Console.WriteLine($"{grabber.Remote.Get<string>("DeviceModelName")} "
@@ -75,7 +75,7 @@ namespace SimpleGrab
                             }
                             catch
                             {
-                                Console.WriteLine("(카메라 정보 응답 없음)");
+                                Console.WriteLine("(no camera info)");
                             }
 
                             // 1) DMA 버퍼 할당
@@ -86,7 +86,7 @@ namespace SimpleGrab
                             //    실 카메라·PlayLink 모두 true 가 안전하다.
                             grabber.Start((ulong)FramesToGrab, true);
 
-                            Console.WriteLine($"그랩 시작 ({FramesToGrab} frames 요청)");
+                            Console.WriteLine($"Grab started (requesting {FramesToGrab} frames)");
                             Console.WriteLine();
 
                             // 3) N장 pop
@@ -112,17 +112,30 @@ namespace SimpleGrab
                                 }
                             }
                             Console.WriteLine();
-                            Console.WriteLine("그랩 완료");
+                            Console.WriteLine("Grab complete");
                         }
                     }
                 }
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"오류: {e.Message}");
+                Console.Error.WriteLine($"Error: {e.Message}");
                 return 1;
             }
+            finally
+            {
+                WaitForExit();
+            }
             return 0;
+        }
+
+        // ── 콘솔 창이 즉시 닫히지 않도록 키 입력 대기 ─────────────────────────────
+        // 입력이 리다이렉트된 경우(파이프/CI)는 hang 방지를 위해 그냥 통과한다.
+        private static void WaitForExit()
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit...");
+            if (!Console.IsInputRedirected) Console.ReadKey(true);
         }
     }
 }

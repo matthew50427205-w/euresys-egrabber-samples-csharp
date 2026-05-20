@@ -29,8 +29,13 @@ namespace HelloEgrabber
 {
     internal static class Program
     {
-        // ── DiscoverWith: 지정 Producer 로 시스템 스캔 후 grabber / camera 목록 출력 ──
+        // ── DiscoverWith: 지정 Producer 로 시스템 스캔 후 interface / grabber / camera 목록 출력 ──
         // cti: CtiPath.Coaxlink 또는 CtiPath.Playlink   반환: 발견된 grabber 수 (실패=0)
+        //
+        // SDK 용어 정리
+        //   interface = 물리 PCIe 보드 1장 (Coaxlink Quad 등)
+        //   egrabber  = 보드 위의 카메라 채널 1개 (한 보드 = N 채널 = N egrabbers)
+        //   camera    = 실제로 감지된 카메라 디바이스
         private static int DiscoverWith(string cti, string tag)
         {
             try
@@ -41,16 +46,24 @@ namespace HelloEgrabber
                     discovery.Discover();
                     Console.WriteLine();
                     Console.WriteLine("========================================");
-                    Console.WriteLine($"  {tag} 로 스캔");
+                    Console.WriteLine($"  Scan with {tag}");
                     Console.WriteLine("========================================");
-                    Console.WriteLine($"egrabbers : {discovery.GrabberCount}");
-                    Console.WriteLine($"cameras   : {discovery.CameraCount}");
+                    Console.WriteLine($"interfaces : {discovery.InterfaceCount}   (physical boards)");
+                    Console.WriteLine($"egrabbers  : {discovery.GrabberCount}    (camera channels)");
+                    Console.WriteLine($"cameras    : {discovery.CameraCount}");
 
-                    // egrabbers 목록 출력
+                    // interfaces (physical boards) 목록 출력
+                    for (int i = 0; i < discovery.InterfaceCount; ++i)
+                    {
+                        var ifInfo = discovery.GetInterfaceInfo(i);
+                        Console.WriteLine($"  [interface #{i}] {ifInfo.InterfaceID}");
+                    }
+
+                    // egrabbers (channels) 목록 출력 — 어느 interface 에 속하는지 함께 표기
                     for (int i = 0; i < discovery.GrabberCount; ++i)
                     {
                         var info = discovery.EGrabbers[i];
-                        Console.Write($"  [egrabber #{i}] {info.DeviceID}");
+                        Console.Write($"  [egrabber #{i}] {info.DeviceID}  on  {info.InterfaceID}");
                         if (info.IsRemoteAvailable)
                             Console.Write($"  ({info.DeviceModelName})");
                         Console.WriteLine();
@@ -68,7 +81,7 @@ namespace HelloEgrabber
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"[{tag}] 실패: {e.Message}");
+                Console.Error.WriteLine($"[{tag}] failed: {e.Message}");
                 return 0;
             }
         }
@@ -85,7 +98,7 @@ namespace HelloEgrabber
                 using (var grabber = new EG.EGrabber(discovery.EGrabbers[0]))
                 {
                     Console.WriteLine();
-                    Console.WriteLine("--- 첫번째 grabber 상세 ---");
+                    Console.WriteLine("--- First grabber details ---");
 
                     // InterfaceModule / DeviceModule 파라미터
                     try { Console.WriteLine($"  Interface ID  : {grabber.Interface.Get<string>("InterfaceID")}"); }
@@ -104,7 +117,7 @@ namespace HelloEgrabber
                     }
                     catch (Exception e)
                     {
-                        Console.WriteLine($"  Camera        : (응답 없음 - {e.Message})");
+                        Console.WriteLine($"  Camera        : (no response - {e.Message})");
                     }
                 }
             }
@@ -114,17 +127,17 @@ namespace HelloEgrabber
         {
             try
             {
-                Console.WriteLine("1) 실 Coaxlink 보드 탐지 시도...");
+                Console.WriteLine("1) Trying to detect a real Coaxlink board...");
                 int n = DiscoverWith(EG.CtiPath.Coaxlink, "Coaxlink");
 
                 if (n == 0)
                 {
                     Console.WriteLine();
-                    Console.WriteLine("실 보드 없음. PlayLink 로 재시도합니다.");
+                    Console.WriteLine("No real board found. Retrying with PlayLink.");
                     n = DiscoverWith(EG.CtiPath.Playlink, "PlayLink");
                     if (n == 0)
                     {
-                        Console.Error.WriteLine("어느 Producer 로도 grabber 를 찾지 못했습니다.");
+                        Console.Error.WriteLine("No grabber found with any producer.");
                         return 1;
                     }
                     InspectFirstGrabber(EG.CtiPath.Playlink);
@@ -136,10 +149,23 @@ namespace HelloEgrabber
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"오류: {e.Message}");
+                Console.Error.WriteLine($"Error: {e.Message}");
                 return 1;
             }
+            finally
+            {
+                WaitForExit();
+            }
             return 0;
+        }
+
+        // ── 콘솔 창이 즉시 닫히지 않도록 키 입력 대기 ─────────────────────────────
+        // 입력이 리다이렉트된 경우(파이프/CI)는 hang 방지를 위해 그냥 통과한다.
+        private static void WaitForExit()
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit...");
+            if (!Console.IsInputRedirected) Console.ReadKey(true);
         }
     }
 }

@@ -34,6 +34,11 @@ namespace CallbackGrab
         private const int BufferCount  = 4;
         private const int FramesToGrab = 20;
 
+        // 콜백과 메인 루프가 공유하는 수신 카운터.
+        // 람다 캡처 대신 클래스 필드로 두면 별도 메서드(OnNewBuffer)에서도 접근 가능.
+        // Interlocked 로만 읽고/쓰기 — 두 스레드에서 동시 접근하므로 race condition 방지.
+        private static long received = 0;
+
         // ── OpenGenTL: Coaxlink → PlayLink 순서로 EGenTL 열기 ────────────────────────
         // producer: 실제 사용된 Producer 이름 (로그/디버그용 out 파라미터).
         private static EG.EGenTL OpenGenTL(out string producer)
@@ -67,7 +72,7 @@ namespace CallbackGrab
                         discovery.Discover();
                         if (discovery.GrabberCount == 0)
                         {
-                            Console.Error.WriteLine("사용 가능한 grabber 없음.");
+                            Console.Error.WriteLine("No grabber available.");
                             return 1;
                         }
 
@@ -84,37 +89,25 @@ namespace CallbackGrab
                             }
                             catch (Exception e)
                             {
-                                Console.Error.WriteLine($"RunScript 실패 ({script}): {e.Message}");
-                                Console.Error.WriteLine("  -> 기본 설정으로 진행합니다.");
+                                Console.Error.WriteLine($"RunScript failed ({script}): {e.Message}");
+                                Console.Error.WriteLine("  -> Falling back to default settings.");
                             }
 
-                            long received = 0;
+                            received = 0;   // 매 실행마다 카운터 리셋
 
-                            // 2) 콜백 등록 : 프레임 1장이 도착할 때마다 이 람다가 호출됨.
-                            //    ScopedBuffer(g, data) 는 NewBufferData 를 받아
-                            //    버퍼를 RAII 로 감싼다 (using 종료 시 자동 큐 반환).
-                            grabber.RegisterEventCallback<EG.NewBufferData>((g, data) =>
-                            {
-                                using (var buf = new EG.ScopedBuffer(g, data))
-                                {
-                                    ulong fid  = buf.GetInfo<ulong>(EG.BUFFER_INFO_CMD.BUFFER_INFO_FRAMEID);
-                                    ulong ts   = buf.GetInfo<ulong>(EG.BUFFER_INFO_CMD.BUFFER_INFO_TIMESTAMP);
-                                    ulong size = buf.GetInfo<ulong>(EG.BUFFER_INFO_CMD.BUFFER_INFO_SIZE);
-
-                                    long n = Interlocked.Increment(ref received);
-                                    Console.WriteLine(
-                                        $"[callback] frame {n,3} | FID={fid,5} | size={size} B | ts={ts} us");
-                                }
-                            });
+                            // 2) 콜백 등록 : 프레임 1장이 도착할 때마다 OnNewBuffer 가 호출됨.
+                            //    람다 대신 별도 메서드를 등록 — 단위 테스트/디버깅/재사용 용이.
+                            grabber.RegisterEventCallback<EG.NewBufferData>(OnNewBuffer);
 
                             // 3) 수신할 이벤트 종류 활성화.
                             //    Start() 호출 전에 명시적으로 지정해야 ProcessEventsAsync 가 동작한다.
                             grabber.EnableEvent(EG.EventType.NewBufferData);
 
                             // 4) DMA 버퍼 확보 후 무한 그랩 시작.
-                            //    controlRemoteDevice=true : AcquisitionStart 명령 자동 실행.
+                            //    Start() : 인자 생략 = 무한 그랩 + AcquisitionStart 자동 실행
+                            //    (유레시스 공식 권장. ulong.MaxValue 와 동일하지만 의미 명확)
                             grabber.ReallocBuffers((ulong)BufferCount);
-                            grabber.Start(ulong.MaxValue, true);
+                            grabber.Start();
 
                             // 5) 이벤트 루프 시작.
                             //    ProcessEventsAsync 가 내부적으로 ProcessEvent 를 반복 호출하면서
@@ -124,7 +117,7 @@ namespace CallbackGrab
                             var task = grabber.ProcessEventsAsync(EG.EventType.NewBufferData, cts.Token);
 
                             Console.WriteLine();
-                            Console.WriteLine($"프레임 {FramesToGrab} 장 받을 때까지 대기...");
+                            Console.WriteLine($"Waiting for {FramesToGrab} frames...");
 
                             // 6) N 장 수신 완료를 기다린다.
                             while (Interlocked.Read(ref received) < FramesToGrab)
@@ -136,17 +129,50 @@ namespace CallbackGrab
                             grabber.Stop();
 
                             Console.WriteLine();
-                            Console.WriteLine($"총 {received} frames 수신 후 종료");
+                            Console.WriteLine($"Done. Received {received} frames.");
                         }
                     }
                 }
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"오류: {e.Message}");
+                Console.Error.WriteLine($"Error: {e.Message}");
                 return 1;
             }
+            finally
+            {
+                WaitForExit();
+            }
             return 0;
+        }
+
+        // ── 새 프레임 콜백 ────────────────────────────────────────────────────────
+        // grabber.RegisterEventCallback<NewBufferData> 로 등록되어, 새 프레임이 도착할
+        // 때마다 SDK 가 이벤트 스레드(ProcessEventsAsync 가 만든 Task) 에서 호출한다.
+        //
+        // 주의: 이 메서드는 메인 스레드가 아니라 별도 스레드에서 실행된다.
+        //       공유 카운터 received 는 반드시 Interlocked 로만 접근.
+        private static void OnNewBuffer(EG.EGrabber g, EG.NewBufferData data)
+        {
+            using (var buf = new EG.ScopedBuffer(g, data))
+            {
+                ulong fid  = buf.GetInfo<ulong>(EG.BUFFER_INFO_CMD.BUFFER_INFO_FRAMEID);
+                ulong ts   = buf.GetInfo<ulong>(EG.BUFFER_INFO_CMD.BUFFER_INFO_TIMESTAMP);
+                ulong size = buf.GetInfo<ulong>(EG.BUFFER_INFO_CMD.BUFFER_INFO_SIZE);
+
+                long n = Interlocked.Increment(ref received);
+                Console.WriteLine(
+                    $"[callback] frame {n,3} | FID={fid,5} | size={size} B | ts={ts} us");
+            }
+        }
+
+        // ── 콘솔 창이 즉시 닫히지 않도록 키 입력 대기 ─────────────────────────────
+        // 입력이 리다이렉트된 경우(파이프/CI)는 hang 방지를 위해 그냥 통과한다.
+        private static void WaitForExit()
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit...");
+            if (!Console.IsInputRedirected) Console.ReadKey(true);
         }
     }
 }

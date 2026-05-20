@@ -56,7 +56,7 @@ namespace CameraParameters
         private static void DumpCurrent(EG.EGrabber g)
         {
             Console.WriteLine();
-            Console.WriteLine("--- 현재 카메라 설정 ---");
+            Console.WriteLine("--- Current camera settings ---");
             Dump(g, "DeviceVendorName");
             Dump(g, "DeviceModelName");
             Dump(g, "Width");
@@ -75,13 +75,26 @@ namespace CameraParameters
         private static void ApplySettings(EG.EGrabber g)
         {
             Console.WriteLine();
-            Console.WriteLine("--- 카메라 설정 변경 ---");
+            Console.WriteLine("--- Applying camera settings ---");
 
             TrySetString(g, "PixelFormat", "Mono8");
             TrySetInteger(g, "OffsetX", 0);
             TrySetInteger(g, "OffsetY", 0);
-            TrySetInteger(g, "Width",   640);
-            TrySetInteger(g, "Height",  480);
+
+            // Width/Height: 기존 값을 읽어 그대로 다시 set (값 변경 없음).
+            // 라인스캔/고정 ROI 카메라에서 임의 해상도를 거부하는 경우를 회피.
+            try
+            {
+                long curWidth  = g.Remote.Get<long>("Width");
+                long curHeight = g.Remote.Get<long>("Height");
+                TrySetInteger(g, "Width",  curWidth);
+                TrySetInteger(g, "Height", curHeight);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"  Width/Height read failed: {e.Message}");
+            }
+
             TrySetFloat  (g, "ExposureTime", 5000.0);
             TrySetFloat  (g, "Gain",         1.0);
             TrySetString (g, "TriggerMode",  "Off");
@@ -95,7 +108,7 @@ namespace CameraParameters
             g.Start((ulong)n, true);
 
             Console.WriteLine();
-            Console.WriteLine($"--- 변경된 설정으로 {n}장 그랩 ---");
+            Console.WriteLine($"--- Short grab of {n} frames with new settings ---");
             for (int i = 0; i < n; ++i)
             {
                 using (var buf = new EG.ScopedBuffer(g, 1000ul))
@@ -136,7 +149,7 @@ namespace CameraParameters
                     Console.WriteLine($"Producer : {producer}");
                     if (discovery.GrabberCount == 0)
                     {
-                        Console.Error.WriteLine("사용 가능한 grabber 없음.");
+                        Console.Error.WriteLine("No grabber available.");
                         return 1;
                     }
 
@@ -151,10 +164,23 @@ namespace CameraParameters
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"오류: {e.Message}");
+                Console.Error.WriteLine($"Error: {e.Message}");
                 return 1;
             }
+            finally
+            {
+                WaitForExit();
+            }
             return 0;
+        }
+
+        // ── 콘솔 창이 즉시 닫히지 않도록 키 입력 대기 ─────────────────────────────
+        // 입력이 리다이렉트된 경우(파이프/CI)는 hang 방지를 위해 그냥 통과한다.
+        private static void WaitForExit()
+        {
+            Console.WriteLine();
+            Console.WriteLine("Press any key to exit...");
+            if (!Console.IsInputRedirected) Console.ReadKey(true);
         }
     }
 }
